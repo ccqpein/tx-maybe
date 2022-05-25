@@ -21,15 +21,15 @@ fn clean(content: impl Iterator<Item = u8>) -> Vec<u8> {
 #[derive(Debug, Deserialize, PartialEq)]
 pub struct Record {
     #[serde(rename(deserialize = "type"))]
-    record_type: String,
+    pub record_type: String,
 
     #[serde(rename(deserialize = "client"))]
-    client_id: u16,
+    pub client_id: u16,
 
     #[serde(rename(deserialize = "tx"))]
-    tx_id: u32,
+    pub tx_id: u32,
 
-    amount: f64, //:= maybe f128?
+    pub amount: f64, //:= maybe f128?
 }
 
 impl Record {
