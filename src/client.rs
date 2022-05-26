@@ -1,6 +1,9 @@
 use csv::Writer;
 use serde::{Serialize, Serializer};
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    io::{Error, ErrorKind},
+};
 
 use crate::csv_parser::Record;
 
@@ -77,7 +80,7 @@ impl Client {
         c
     }
 
-    pub fn handle_transaction(&mut self, mut tx: Transactions) -> Result<(), String> {
+    pub fn handle_transaction(&mut self, tx: Transactions) -> Result<(), String> {
         match tx {
             Transactions::Deposit(_, tx_id, amount) => {
                 self.available += amount;
@@ -174,16 +177,18 @@ impl Client {
     }
 }
 
-pub fn write_csv<'a>(clients: impl Iterator<Item = &'a Client>) -> Result<String, String> {
+pub fn write_csv<'a>(clients: impl Iterator<Item = &'a Client>) -> Result<String, Error> {
     let mut wtr = Writer::from_writer(vec![]);
     for c in clients {
-        wtr.serialize(c);
+        wtr.serialize(c)
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
     }
 
-    Ok(
-        String::from_utf8(wtr.into_inner().map_err(|e| e.to_string())?)
-            .map_err(|e| e.to_string())?,
+    String::from_utf8(
+        wtr.into_inner()
+            .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?,
     )
+    .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
 }
 
 fn four_place<S>(x: &f64, s: S) -> Result<S::Ok, S::Error>
@@ -200,7 +205,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_client_deposit() {
+    fn test_client_deposit() -> Result<(), String> {
         let mut c0: Client = Default::default();
         c0.id = 1;
 
@@ -226,53 +231,54 @@ mod tests {
         ];
 
         for r in records.iter() {
-            c0.handle_transaction(r.into());
+            c0.handle_transaction(r.into())?;
         }
 
         assert_eq!(c0.available, 1.5);
         assert_eq!(c0.total, 1.5);
 
         // dispute 1
-        c0.handle_transaction(Transactions::Dispute(1, 1));
+        c0.handle_transaction(Transactions::Dispute(1, 1))?;
         assert_eq!(c0.available, 0.5);
         assert_eq!(c0.total, 1.5);
         assert_eq!(c0.held, 1_f64);
 
         // dispute 1 again, shouldn't happen anything
-        c0.handle_transaction(Transactions::Dispute(1, 1));
+        c0.handle_transaction(Transactions::Dispute(1, 1))?;
         assert_eq!(c0.available, 0.5);
         assert_eq!(c0.total, 1.5);
         assert_eq!(c0.held, 1_f64);
 
         // resolve 1
-        c0.handle_transaction(Transactions::Resolve(1, 1));
+        c0.handle_transaction(Transactions::Resolve(1, 1))?;
         assert_eq!(c0.available, 1.5);
         assert_eq!(c0.total, 1.5);
         assert_eq!(c0.held, 0_f64);
 
         // resolve 1 again, shouldn't happen anything
-        c0.handle_transaction(Transactions::Resolve(1, 1));
+        c0.handle_transaction(Transactions::Resolve(1, 1))?;
         assert_eq!(c0.available, 1.5);
         assert_eq!(c0.total, 1.5);
         assert_eq!(c0.held, 0_f64);
 
         // nothing happen, dispute set doesn't has tx_id 1 anymore
-        c0.handle_transaction(Transactions::Chargeback(1, 1));
+        c0.handle_transaction(Transactions::Chargeback(1, 1))?;
         assert_eq!(c0.available, 1.5);
         assert_eq!(c0.total, 1.5);
         assert_eq!(c0.held, 0_f64);
 
         // dispute
-        c0.handle_transaction(Transactions::Dispute(1, 1));
+        c0.handle_transaction(Transactions::Dispute(1, 1))?;
         // chargeback
-        c0.handle_transaction(Transactions::Chargeback(1, 1));
+        c0.handle_transaction(Transactions::Chargeback(1, 1))?;
         assert_eq!(c0.available, 0.5);
         assert_eq!(c0.total, 0.5);
         assert_eq!(c0.held, 0_f64);
+        Ok(())
     }
 
     #[test]
-    fn test_clients_write_to_csv() {
+    fn test_clients_write_to_csv() -> Result<(), Error> {
         let mut c0: Client = Default::default();
         c0.id = 1;
 
@@ -298,16 +304,17 @@ mod tests {
         ];
 
         for r in records.iter() {
-            c0.handle_transaction(r.into());
+            c0.handle_transaction(r.into())
+                .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
         }
 
         let mut test_set = vec![c0];
         assert_eq!(
-            write_csv(test_set.iter()),
-            Ok("client,available,held,total,locked\n1,1.5,0.0,1.5,false\n".into())
+            write_csv(test_set.iter())?,
+            "client,available,held,total,locked\n1,1.5,0.0,1.5,false\n"
         );
 
-        let mut c1: Client = Client {
+        let c1: Client = Client {
             id: 2,
             available: 0.123456789,
             held: 0.12345,
@@ -320,8 +327,9 @@ mod tests {
         test_set.push(c1);
 
         assert_eq!(
-            write_csv(test_set.iter()),
-            Ok("client,available,held,total,locked\n1,1.5,0.0,1.5,false\n2,0.1234,0.1234,0.1234,false\n".into())
+            write_csv(test_set.iter())?,
+            "client,available,held,total,locked\n1,1.5,0.0,1.5,false\n2,0.1234,0.1234,0.1234,false\n"
         );
+        Ok(())
     }
 }

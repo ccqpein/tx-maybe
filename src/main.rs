@@ -8,7 +8,7 @@ fn main() -> Result<(), Error> {
     let path = args
         .nth(1)
         .ok_or("no input file")
-        .map_err(|e| Error::new(ErrorKind::InvalidInput, "no input file"))?;
+        .map_err(|_| Error::new(ErrorKind::InvalidInput, "no input file"))?;
 
     println!("{}", entry_func(path)?);
 

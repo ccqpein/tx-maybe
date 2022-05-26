@@ -1,9 +1,7 @@
-use csv::Reader;
-use serde::ser::StdError;
 use serde::Deserialize;
 use std::fs::File;
-use std::io::{BufReader, Read};
-use std::{error::Error, path::Path};
+use std::io::Read;
+use std::path::Path;
 
 pub fn handle_transaction_file(p: impl AsRef<Path>) -> Result<Vec<u8>, std::io::Error> {
     let mut f = File::open(p)?;
@@ -33,6 +31,7 @@ pub struct Record {
 }
 
 impl Record {
+    #[cfg(test)]
     fn new(record_type: String, client_id: u16, tx_id: u32, amount: f64) -> Self {
         Self {
             record_type,

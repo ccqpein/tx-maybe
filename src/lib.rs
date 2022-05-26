@@ -28,5 +28,5 @@ pub fn entry_func(path: impl AsRef<Path>) -> Result<String, Error> {
             .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
     }
 
-    write_csv(client_map.values()).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
+    write_csv(client_map.values())
 }
