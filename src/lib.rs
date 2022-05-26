@@ -12,7 +12,7 @@ mod client;
 use client::*;
 
 /// glue function
-pub fn entry_func(path: impl AsRef<Path>) -> Result<(), Error> {
+pub fn entry_func(path: impl AsRef<Path>) -> Result<String, Error> {
     let raw_data = handle_transaction_file(path)?;
     let mut rdr = ReaderBuilder::new().from_reader(raw_data.as_slice());
 
@@ -28,8 +28,5 @@ pub fn entry_func(path: impl AsRef<Path>) -> Result<(), Error> {
             .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
     }
 
-    write_csv(client_map.values())
-        .map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))?;
-
-    Ok(())
+    write_csv(client_map.values()).map_err(|e| Error::new(ErrorKind::InvalidData, e.to_string()))
 }
