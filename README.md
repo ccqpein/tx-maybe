@@ -11,6 +11,8 @@ csv file maybe have a lot additional spaces. So I use `csv_parser/clean` to clea
 **Ideas**
 
 > maybe read file line by line, make it like a stream. Except the header, each line is a record, which can used inside `src/client`. Save memory.
+>
 > maybe use BufReader for csv file? Maybe not, because BufReader used in the situation `small and repeated read calls to the same file`. 
-> but, if we have a network socket (tcp connection) of our csv data, we can use it.
+>
+> but, if we have a network socket (tcp connection) of our csv data, we can use it (I guess).
 
