@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use crate::csv_parser::Record;
 
 #[derive(Debug, PartialEq)]
-enum Transactions {
+pub enum Transactions {
     Deposit(u16, u32, f64),
     Withdrawal(u16, u32, f64),
     Dispute(u16, u32),
@@ -34,7 +34,7 @@ impl From<&Record> for Transactions {
 }
 
 impl Transactions {
-    fn get_client_id(&self) -> u16 {
+    pub fn get_client_id(&self) -> u16 {
         match self {
             &Transactions::Deposit(client_id, _, _) => client_id,
             &Transactions::Withdrawal(client_id, _, _) => client_id,
@@ -46,7 +46,7 @@ impl Transactions {
 }
 
 #[derive(Debug, PartialEq, Default, Serialize)]
-struct Client {
+pub struct Client {
     #[serde(rename(serialize = "client"))]
     id: u16,
 
@@ -71,7 +71,13 @@ struct Client {
 }
 
 impl Client {
-    fn handle_transaction(&mut self, mut tx: Transactions) -> Result<(), String> {
+    pub fn new(cid: u16) -> Self {
+        let mut c: Self = Default::default();
+        c.id = cid;
+        c
+    }
+
+    pub fn handle_transaction(&mut self, mut tx: Transactions) -> Result<(), String> {
         match tx {
             Transactions::Deposit(_, tx_id, amount) => {
                 self.available += amount;
@@ -111,7 +117,6 @@ impl Client {
                         match ttxx {
                             //:= I guess the dispute only works for Deposit?
                             Transactions::Deposit(_, _, amount) => {
-                                //:= what if the available less than amount
                                 self.available -= amount;
                                 self.held += amount;
 
@@ -169,9 +174,9 @@ impl Client {
     }
 }
 
-fn write_csv(clients: &[&Client]) -> Result<String, String> {
+pub fn write_csv<'a>(clients: impl Iterator<Item = &'a Client>) -> Result<String, String> {
     let mut wtr = Writer::from_writer(vec![]);
-    for &c in clients {
+    for c in clients {
         wtr.serialize(c);
     }
 
@@ -296,8 +301,9 @@ mod tests {
             c0.handle_transaction(r.into());
         }
 
+        let mut test_set = vec![c0];
         assert_eq!(
-            write_csv(&vec![&c0]),
+            write_csv(test_set.iter()),
             Ok("client,available,held,total,locked\n1,1.5,0.0,1.5,false\n".into())
         );
 
@@ -311,8 +317,10 @@ mod tests {
             dispute_transactions: Default::default(),
         };
 
+        test_set.push(c1);
+
         assert_eq!(
-            write_csv(&vec![&c0, &c1]),
+            write_csv(test_set.iter()),
             Ok("client,available,held,total,locked\n1,1.5,0.0,1.5,false\n2,0.1234,0.1234,0.1234,false\n".into())
         );
     }
