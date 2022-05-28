@@ -44,6 +44,8 @@ impl Record {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Write;
+
     use super::*;
     use csv::ReaderBuilder;
 
@@ -73,5 +75,87 @@ withdrawal,  1,     4, 1.5000
             let r: Record = record.unwrap();
             assert_eq!(r, result_case[ind]);
         }
+    }
+
+    #[test]
+    fn test_read_single_line() {
+        use csv::{ByteRecord, StringRecord};
+
+        let record = ByteRecord::from(vec!["deposit", "1", "1", "1.0000"]);
+
+        assert_eq!(
+            record.deserialize::<Record>(None).unwrap(),
+            Record::new("deposit".into(), 1, 1, 1_f64)
+        );
+    }
+
+    #[test]
+    fn test_read_stream() -> Result<(), std::io::Error> {
+        use csv::ByteRecord;
+        use std::io::{BufRead, BufReader};
+        use std::net::{TcpListener, TcpStream};
+        use std::thread;
+
+        let listener = TcpListener::bind("127.0.0.1:9090").unwrap();
+
+        thread::spawn(move || {
+            let test_case = "
+
+    deposit,     1,1, 1.0000
+    deposit,  2,2, 2
+    deposit,  1,3, 2
+    withdrawal,  1,     4, 1.5000
+        withdrawal,2,5,3.0
+    ";
+            let mut stream = TcpStream::connect("127.0.0.1:9090").unwrap();
+            stream.write_all(test_case.as_bytes());
+        });
+
+        let result_case = vec![
+            Record::new("deposit".into(), 1, 1, 1_f64),
+            Record::new("deposit".into(), 2, 2, 2_f64),
+            Record::new("deposit".into(), 1, 3, 2_f64),
+            Record::new("withdrawal".into(), 1, 4, 1.5_f64),
+            Record::new("withdrawal".into(), 2, 5, 3.0_f64),
+        ];
+
+        for stream in listener.incoming() {
+            let mut br = BufReader::new(stream?);
+            let mut line_buffer = String::new();
+
+            let mut nth = 0;
+
+            loop {
+                match br.read_line(&mut line_buffer) {
+                    Ok(a) if a == 0 => break,
+                    Err(_) => break,
+                    _ => {
+                        //dbg!(&line_buffer);
+                        let clean_line = line_buffer
+                            .split(|c| c == ' ' || c == ',' || c == '\n')
+                            .filter(|&w| w != "")
+                            .collect::<Vec<&str>>();
+
+                        if clean_line.is_empty() {
+                            break;
+                        }
+
+                        let record = ByteRecord::from(clean_line);
+
+                        //dbg!(record.deserialize::<Record>(None));
+
+                        assert_eq!(
+                            result_case[nth],
+                            record.deserialize::<Record>(None).unwrap()
+                        );
+                        line_buffer.clear();
+                        nth += 1;
+                    }
+                }
+            }
+            break; // I only need the first stream connection;
+        }
+
+        Ok(())
     }
 }

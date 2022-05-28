@@ -16,3 +16,6 @@ csv file maybe have a lot additional spaces. So I use `csv_parser/clean` to clea
 >
 > but, if we have a network socket (tcp connection) of our csv data, we can use it (I guess).
 
+**update on 5/27/2022**
+
+`test_read_stream` in `src/csv_parser.rs` use `BufReader` run the `TcpStream` for reading each line of csv tcp stream (without headers). So we can use stream rather than read a big file, beside, stream reading can fit concurrency easily.
